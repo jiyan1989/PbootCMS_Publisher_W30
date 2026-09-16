@@ -197,3 +197,7 @@ py -3 -m venv .venv
 ## 问题反馈
 
 功能问题和可复现的缺陷可通过仓库 [Issues](https://github.com/jiyan1989/PbootCMS_Publisher_W30/issues) 记录。问题描述中应移除站点地址、账号密码、Cookie、会话文件和其他敏感数据。
+
+## 许可证
+
+本项目采用 [MIT License](LICENSE)。
