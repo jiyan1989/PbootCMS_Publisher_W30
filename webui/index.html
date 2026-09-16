@@ -1,0 +1,888 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>PbootCMS 发文助手 W</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div id="app">
+
+  <!-- ══ 顶栏 ══ -->
+  <header class="topbar">
+    <div class="brand">
+      <span class="brand-mark">P</span>
+      <span class="brand-copy">
+        <strong>PbootCMS 发文助手</strong>
+        <em id="ver"></em>
+      </span>
+    </div>
+    <div class="site-box">
+      <button id="btnAbout" class="ghost compact" title="查看版本、更新日志和升级准备状态">
+        版本与更新 <span id="updateBadge" class="update-dot" hidden></span>
+      </button>
+      <button id="btnClearAllCache" class="ghost compact" title="清理当前已登录网站的全部 PbootCMS 运行缓存" disabled>
+        清理所有缓存
+      </button>
+      <button id="btnOpenAdmin" class="ghost compact" title="在浏览器中打开当前后台原生页面，使用完整 CMS 模块和编辑器；浏览器会话可能需要重新登录" hidden>
+        原生后台
+      </button>
+      <span id="siteState" class="pill off">未连接</span>
+      <button id="btnLogout" class="ghost" hidden>退出当前站点</button>
+    </div>
+  </header>
+
+  <!-- ══ Chrome 风标签栏（每个后台一个标签，同时登录互不影响）══ -->
+  <div class="tabbar" id="tabbar">
+    <span class="tabbar-label">工作站点</span>
+    <div class="tabstrip" id="tabStrip"></div>
+    <button class="tab-add" id="btnNewTab" title="新建站点标签" aria-label="新建站点标签">＋</button>
+  </div>
+
+  <!-- ══ 登录卡片（浮层）══ -->
+  <div id="loginMask" class="mask" hidden>
+    <div class="card login-card">
+      <div class="login-head">
+        <span class="login-mark">P</span>
+        <div><h3>登录网站后台</h3><p>连接一个 PbootCMS 管理后台</p></div>
+      </div>
+      <div class="row login-row">
+        <label>后台地址</label>
+        <input id="loginUrl" list="siteList" placeholder="https://站点/admin.php">
+        <datalist id="siteList"></datalist>
+      </div>
+      <div class="row login-row">
+        <label>历史地址</label>
+        <select id="loginHistory">
+          <option value="">— 选择已保存的后台（最多30个）—</option>
+        </select>
+        <button id="btnForgetHistory" class="ghost" type="button">删除</button>
+      </div>
+      <div class="row login-row">
+        <label>网络方式</label>
+        <select id="loginNetworkMode" title="与网页使用的代理环境保持一致；默认直连">
+          <option value="direct">直连（默认）</option>
+          <option value="system">跟随系统代理</option>
+          <option value="custom">自定义 HTTP(S) 代理</option>
+        </select>
+        <input id="loginProxyUrl" placeholder="http://127.0.0.1:7890" hidden>
+      </div>
+      <div class="row login-row">
+        <label>用户名</label><input id="loginUser" autocomplete="username">
+      </div>
+      <div class="row login-row">
+        <label>密码</label>
+        <div class="password-field">
+          <input id="loginPass" type="password" autocomplete="current-password"
+                 spellcheck="false" autocapitalize="off">
+          <button id="btnTogglePass" class="password-toggle" type="button"
+                  aria-label="显示密码" title="显示密码">显示</button>
+        </div>
+      </div>
+      <div class="row login-row" id="capRow" hidden>
+        <label>验证码</label>
+        <input id="loginCode" maxlength="8" style="width:110px">
+        <img id="capImg" title="点击刷新验证码" alt="验证码">
+      </div>
+      <div class="row btns">
+        <button id="btnFetchCap" class="ghost">获取验证码</button>
+        <button id="btnLogin" class="cta">登 录</button>
+        <button id="btnNativeLogin" class="ghost" type="button" title="用完整网页处理 SSO、动态验证码和脚本登录">原生网页登录</button>
+        <button id="btnSyncNativeLogin" class="ghost" type="button" title="将原生网页 CookieStore 同步回软件会话">同步网页登录</button>
+        <button id="btnLoginCancel" class="ghost">取消</button>
+      </div>
+      <p id="loginMsg" class="msg"></p>
+    </div>
+  </div>
+
+  <!-- ══ 主体 ══ -->
+  <div id="emptyState" class="empty-state">
+    <div class="empty-card">
+      <div class="empty-icon"><span>P</span></div>
+      <p class="page-kicker">PBOOTCMS PUBLISHING WORKSPACE</p>
+      <h2>从一个网站后台开始</h2>
+      <p>每个标签对应一个独立网站会话，可以同时登录多个后台并行处理内容。</p>
+      <button id="btnNewTabBig" class="cta big">＋ 新建站点标签</button>
+    </div>
+  </div>
+
+  <!-- ══ 主体（单套功能区，按当前标签状态渲染）══ -->
+  <div class="body">
+    <nav class="tabs">
+      <div class="nav-title">工作区</div>
+      <button data-tab="publish" class="on"><span class="nav-icon">发</span><span>内容发布</span></button>
+      <button data-tab="edit"><span class="nav-icon">编</span><span>编辑修改</span></button>
+      <button data-tab="query"><span class="nav-icon">查</span><span>查询修改</span></button>
+      <button data-tab="category"><span class="nav-icon">栏</span><span>栏目管理</span></button>
+      <button data-tab="slide"><span class="nav-icon">轮</span><span>网站轮播</span></button>
+      <button data-tab="single"><span class="nav-icon">页</span><span>单页管理</span></button>
+      <button data-tab="admin"><span class="nav-icon">扩</span><span>其他后台</span></button>
+      <button data-tab="msg"><span class="nav-icon">留</span><span>留言列表</span></button>
+      <button data-tab="log"><span class="nav-icon">志</span><span>运行日志</span></button>
+    </nav>
+
+    <!-- ── 发布 ── -->
+    <section id="tab-publish" class="tab on">
+      <div class="page-head">
+        <div><p class="page-kicker">CONTENT PUBLISHING</p><h2>内容发布</h2>
+          <p>选择内容文件和目标栏目，确认媒体设置及字段映射后发布。</p></div>
+        <span class="flow-label">内容 · 媒体 · 映射</span>
+      </div>
+
+      <div class="publish-layout">
+        <div class="card publish-source">
+          <div class="card-head">
+            <div class="section-title"><span class="step-badge">1</span><div><h3>内容与栏目</h3><p>确定本次发布的数据来源和目标位置</p></div></div>
+          </div>
+          <div class="form-stack">
+            <div class="row form-row">
+              <label>HTML 文件</label>
+              <input id="pubHtml" readonly placeholder="点击右侧选择 SEO HTML…" title="也可将 .html/.htm 文件拖到此处">
+                <button id="btnPickHtml" class="ghost" title="选择 HTML 文件；也可将 .html/.htm 文件拖到此处">选择文件</button>
+            </div>
+            <div class="row batch-pick-row">
+              <span></span>
+              <div class="batch-pick-actions">
+                <button id="btnPickBatchHtml" class="ghost compact" title="选择多个 HTML；也可将 .html/.htm 文件批量拖到此处">选择多个 HTML</button>
+                <button id="btnPickBatchFolder" class="ghost compact">导入文件夹</button>
+                <span class="hint">批量文件会进入下方队列，栏目和发布设置可复用</span>
+              </div>
+            </div>
+            <p id="pubHtmlInfo" class="msg inline-msg"></p>
+            <div class="row form-row">
+              <label>发布栏目</label>
+              <div class="cat-picker">
+                <select id="pubCat" hidden><option value="">— 请先加载栏目 —</option></select>
+                <button type="button" class="cat-toggle" id="pubCatToggle">— 请选择栏目 —</button>
+                <div class="cat-tree" id="pubCatTree" hidden></div>
+              </div>
+              <button id="btnLoadCats" class="ghost">刷新栏目</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="card publish-media">
+          <div class="card-head">
+            <div class="section-title"><span class="step-badge">2</span><div><h3>图片与展示</h3><p>设置正文图、缩略图、文章图集和发布属性</p></div></div>
+          </div>
+          <div class="settings-grid">
+            <div class="setting-item">
+              <label>正文图片</label>
+              <div id="pubManualImageDrop" class="setting-control"><span id="pubImgInfo" class="hint">未解析 HTML</span>
+                <button id="btnPickImgs" class="ghost mini-btn" title="选择正文图片；也可将图片拖到此处">手动选图</button></div>
+            </div>
+            <div class="setting-item">
+              <label>图片宽度</label>
+              <select id="pubWidth">
+                <option value="preserve">保留原有尺寸与样式（默认）</option>
+                <option value="responsive">响应式 790px（主动调整）</option>
+                <option value="fixed">严格固定 790px</option>
+                <option value="original">自适应最大100%并居中</option>
+              </select>
+            </div>
+            <div class="setting-item">
+              <label>正文图插入位置</label>
+              <select id="pubInsertStrategy" title="选择手选图和本地正文图的插入位置">
+                <option value="top">正文开头</option>
+                <option value="before_h2">第一个小标题前</option>
+                <option value="after_first_paragraph">第一段后</option>
+              </select>
+            </div>
+            <div class="setting-item setting-wide">
+              <label>缩略图</label>
+              <div class="setting-control wrap-control">
+                <select id="pubIco">
+                  <option value="none">沿用后台默认（默认）</option>
+                  <option value="file">独立图片文件…</option>
+                  <option value="url">填写已有地址或路径</option>
+                  <option value="clear">明确清空缩略图字段</option>
+                  <option value="first">第一张同站正文图（独立上传缩略图）</option>
+                </select>
+                <button id="btnPubThumb" class="ghost mini-btn" hidden>重新选择图片</button>
+                <span id="pubThumbInfo" class="hint file-hint"></span>
+                <img id="pubThumbPreview" class="media-thumb-preview" alt="发布缩略图预览" hidden>
+                <input id="pubThumbUrl" type="text" placeholder="例如 /static/upload/a.png 或完整 URL" aria-label="发布缩略图地址" hidden>
+                <span id="pubThumbClearHint" class="hint" hidden>提交空值；后台仍可能自动取图，保存后会核对。</span>
+                <label class="check-option" title="发布完成或更换 HTML 后，继续使用当前缩略图设置">
+                  <input type="checkbox" id="pubThumbRemember"> 沿用上次设置
+                </label>
+              </div>
+            </div>
+            <div class="setting-item setting-wide">
+              <label>文章图集</label>
+              <div class="setting-control wrap-control">
+                <span id="pubCarouselInfo" class="hint">未选择</span>
+                <button id="btnPubCarousel" class="ghost mini-btn">选择文章图集</button>
+                <button id="btnPubGalleryEdit" class="ghost mini-btn">逐图标题／排序／删除</button>
+                <span id="pubGalleryInfo" class="hint"></span>
+                <button id="btnPubCarouselClear" class="text-btn" hidden>清除</button>
+              </div>
+            </div>
+            <div class="setting-item setting-wide">
+              <label>图集处理</label>
+              <p class="setting-explain">此处是文章 pics 图集，不是网站横幅轮播。始终将原文件交给后台处理，不在软件端裁切、缩放、转码或改名；如需尺寸处理，请使用后台原生网页。</p>
+              <div class="setting-control wrap-control carousel-size">
+                <select id="pubCarouselSize">
+                  <option value="original">上传原文件（后台处理）</option>
+                </select>
+              </div>
+            </div>
+            <div class="setting-item setting-wide publish-flags">
+              <label>发布属性</label>
+              <div class="setting-control option-group">
+                <label class="check-option"><input type="checkbox" id="pubTop"> 置顶</label>
+                <label class="check-option"><input type="checkbox" id="pubRec"> 推荐</label>
+                <label class="check-option"><input type="checkbox" id="pubHead"> 头条</label>
+                <label class="check-option" title="这是软件额外联网功能，网页直接保存通常不会执行"><input type="checkbox" id="pubCheckLinks"> 发布前检查并处理站内链接</label>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="card publish-mapping">
+          <div class="card-head">
+            <div class="section-title"><span class="step-badge">3</span><div><h3>字段映射</h3><p>确认 HTML 内容写入对应的后台字段</p></div></div>
+            <div class="toolbar-actions">
+              <button id="btnPubPreview" class="ghost compact" title="在隔离浏览器预览当前正文，不执行脚本或提交后台">浏览器预览</button>
+              <button id="btnAutoMap" class="ghost compact">自动映射</button>
+            </div>
+          </div>
+          <p class="mapping-help"><strong>必填：</strong>发布至少需要标题（title）和正文（content）。留空也会按你的修改提交；带“已修改”的行可随时还原。</p>
+          <div class="tbl-wrap mapping-table"><table id="mapTable">
+            <thead><tr><th>HTML 字段</th><th>预览（可修改）</th><th>CMS 字段</th><th>操作</th></tr></thead>
+            <tbody></tbody>
+          </table></div>
+        </div>
+      </div>
+
+      <div id="batchCard" class="card batch-card" hidden>
+        <div class="card-head data-toolbar">
+          <div class="section-title"><div><h3>批量发布队列</h3><p>逐篇执行同样的安全检查；暂停会在当前篇完成后生效</p></div></div>
+          <div class="toolbar-actions">
+            <label class="check-option" title="仅证明候选地址可访问，仍需确认内容是否相关"><input id="batchApplyVerified" type="checkbox"> 自动替换为可访问的产品候选</label>
+            <label class="check-option" title="这会修改原稿：移除 a 标签，但保留其中的文字、图片和格式"><input id="batchSkipUnverified" type="checkbox"> 自动去掉无候选的链接外壳</label>
+            <button id="btnBatchStart" class="cta compact">开始队列</button>
+            <button id="btnBatchPause" class="ghost compact" hidden>暂停</button>
+            <button id="btnBatchResume" class="cta compact" hidden>继续</button>
+            <button id="btnBatchRetry" class="warn compact" hidden>仅重试失败项</button>
+            <button id="btnBatchClear" class="text-btn compact">清空队列</button>
+          </div>
+        </div>
+        <div class="batch-summary"><span id="batchSummary">尚未添加文件</span><span class="hint">点“编辑”可为某一篇单独调整映射和预览值</span></div>
+        <div class="tbl-wrap batch-table"><table id="batchTable">
+          <thead><tr><th>#</th><th>HTML 文件</th><th>状态</th><th>说明</th><th>操作</th></tr></thead>
+          <tbody></tbody>
+        </table></div>
+        </div>
+
+        <div class="card publish-backend-fields">
+          <div class="card-head">
+            <div class="section-title"><span class="step-badge">4</span><div><h3>后台字段设置</h3><p>直接设置当前栏目真实后台表单中的作者、权限组、副栏目及自定义选项。</p></div></div>
+          </div>
+          <p class="mapping-help">这里只提交你主动修改过的字段；文件字段会先按网页控件上传，本地路径不会直接发送。</p>
+          <div class="row form-row content-submit-row" id="pubSubmitterRow" hidden>
+            <label for="pubSubmitter">网页提交按钮</label>
+            <select id="pubSubmitter" class="compact-select" aria-label="选择发布提交按钮"></select>
+            <span class="hint">网页会按实际点击的按钮提交；多个按钮时这里必须明确选择。</span>
+          </div>
+          <div id="pubBackendFields" class="category-form-fields"></div>
+          <p id="pubBackendEmpty" class="hint">选择栏目后显示可设置字段。</p>
+        </div>
+
+        <div class="card action-bar sticky-action">
+        <div class="action-copy"><strong>准备发布</strong><span>建议先运行发布前检查</span></div>
+        <div class="action-buttons">
+          <button id="btnPreflight" class="ghost">发布前检查</button>
+          <button id="btnPubNative" class="ghost" type="button" title="在完整浏览器中打开当前栏目真实新增内容页" disabled>原生网页发布</button>
+          <button id="btnPublish" class="cta big" disabled>立即发布</button>
+          <button id="btnRetryImgs" class="warn" hidden>重试失败图片并继续发布</button>
+          <button id="btnCancelTask" class="ghost" hidden>取消任务</button>
+        </div>
+        <div class="prog" id="pubProg" hidden><div class="bar"></div><span></span></div>
+        <p id="pubMsg" class="msg action-msg"></p>
+      </div>
+    </section>
+
+    <!-- ── 编辑 ── -->
+    <section id="tab-edit" class="tab">
+      <div class="page-head">
+        <div><p class="page-kicker">CONTENT EDITING</p><h2>编辑修改</h2>
+          <p>定位已有文章，可选择新 HTML，并安全保留未修改字段。</p></div>
+        <span class="flow-label">选择 · 设置 · 提交</span>
+      </div>
+
+      <div class="edit-layout">
+        <div class="edit-settings">
+          <div class="card">
+            <div class="card-head">
+              <div class="section-title"><span class="step-badge">1</span><div><h3>选择文章</h3><p>先选择栏目，再载入需要修改的文章</p></div></div>
+            </div>
+            <div class="form-stack">
+              <div class="row form-row">
+                <label>栏目</label>
+                <div class="cat-picker">
+                  <select id="editCat" hidden><option value="">— 请先加载栏目 —</option></select>
+                  <button type="button" class="cat-toggle" id="editCatToggle">— 请选择栏目 —</button>
+                  <div class="cat-tree" id="editCatTree" hidden></div>
+                </div>
+                <button id="btnEditLoadArts" class="ghost">载入文章</button>
+              </div>
+              <div class="row form-row">
+                <label>筛选文章</label>
+                <input id="editFilter" placeholder="按标题 / ID 过滤">
+                <span></span>
+              </div>
+              <div class="row form-row">
+                <label>文章</label>
+                <select id="editArt"><option value="">—</option></select>
+                <button id="btnEditNative" class="ghost compact" type="button" title="在完整浏览器中打开当前文章的真实后台编辑页" disabled>原生网页编辑</button>
+                <button id="btnEditFrontPreview" class="ghost compact" type="button" title="打开后台列表明确提供的真实前台/预览页" disabled>前台预览</button>
+              </div>
+              <div class="row form-row">
+                <label>新 HTML</label>
+                <input id="editHtml" readonly placeholder="可选：选择新内容 HTML（含内置图自动上传）" title="也可将 .html/.htm 文件拖到此处">
+                <button id="btnEditPickHtml" class="ghost" title="选择新的 HTML 文件；也可将 .html/.htm 文件拖到此处">选择文件</button>
+              </div>
+          </div>
+        </div>
+
+        <div class="card" id="bulkLinkCard">
+          <h3>批量更新型号内链</h3>
+          <p class="hint">使用上方所选栏目；只处理起始时间之后发布的文章。只改链接，不改变排版、图片或发布时间。</p>
+          <div class="bulk-bar">
+            <label>起始发布时间 <input id="bulkLinkAfter" type="datetime-local" step="1"></label>
+            <label class="check-option"><input id="bulkLinkAdd" type="checkbox">给未链接的型号补链接</label>
+            <button id="bulkLinkPreview" class="ghost">同步并预览</button>
+            <button id="bulkLinkApply" disabled>按预览一键更新</button>
+            <button id="bulkLinkRestorePreview" class="ghost">预览可恢复备份</button>
+            <button id="bulkLinkRestore" class="ghost" disabled>恢复预览中的正文</button>
+            <button id="bulkLinkCancel" class="ghost" disabled>停止</button>
+          </div>
+          <p id="bulkLinkMsg" class="msg"></p>
+          <div id="bulkLinkRows" style="max-height:360px;overflow:auto"></div>
+          <details><summary>跳过原因 / 处理结果</summary><pre id="bulkLinkDetails" style="white-space:pre-wrap"></pre></details>
+        </div>
+
+        <div class="card content-admin-card">
+          <div class="card-head data-toolbar">
+            <div class="section-title"><div><h3>内容管理</h3><p>使用当前后台真实列表执行复制、移动、删除、排序和状态切换</p></div></div>
+            <div class="toolbar-actions">
+              <input id="contentAdminFilter" class="compact-input" placeholder="标题或 ID" aria-label="内容管理筛选">
+              <button id="btnContentAdminLoad" class="ghost compact">读取列表</button>
+            </div>
+          </div>
+          <div class="bulk-bar content-admin-actions">
+            <label class="check-option"><input id="contentAdminSelectAll" type="checkbox"> 选择当前结果</label>
+            <span id="contentAdminSelected" class="hint">已选 0 项</span>
+            <select id="contentAdminTarget" class="compact-select"><option value="">目标栏目（复制/移动）</option></select>
+            <button id="btnContentAdminCopy" class="ghost compact" disabled>复制</button>
+            <button id="btnContentAdminMove" class="ghost compact" disabled>移动</button>
+            <button id="btnContentAdminDelete" class="ghost compact danger-action" disabled>删除</button>
+            <button id="btnContentAdminSort" class="ghost compact" disabled>保存排序</button>
+          </div>
+          <div class="tbl-wrap content-admin-table"><table id="contentAdminTable"><thead><tr>
+            <th></th><th>ID</th><th>标题</th><th>排序</th><th>状态</th><th>置顶</th><th>推荐</th><th>头条</th><th>网页</th>
+          </tr></thead><tbody></tbody></table></div>
+          <p id="contentAdminMsg" class="msg"></p>
+        </div>
+
+          <div class="card">
+            <div class="card-head">
+              <div class="section-title"><span class="step-badge">2</span><div><h3>更新设置</h3><p>控制字段覆盖范围和文章媒体</p></div></div>
+            </div>
+            <div class="settings-grid">
+              <div class="setting-item setting-wide">
+                <label>覆盖模式</label>
+                <select id="editCover">
+                  <option value="part">仅更新本次明确修改的字段（保留后台最新其他值）</option>
+                </select>
+                <p class="setting-explain">提交前重新读取后台表单；未修改字段保留最新值。目标字段若已变化则停止，避免覆盖其他操作。</p>
+              </div>
+              <div class="setting-item setting-wide">
+                <label>详情图片</label>
+                <div id="editDetailImages" class="detail-images hint">选择文章后可直接替换正文中的单张图片；保留原图 alt 属性。</div>
+                <p class="setting-explain">此功能针对后台当前正文，和“新 HTML”修改互斥；图片上传成功后才会提交文章。</p>
+              </div>
+              <div class="setting-item">
+                <label>正文图插入位置</label>
+                <select id="editInsertStrategy" title="选择新 HTML 正文图的插入位置">
+                  <option value="top">正文开头</option>
+                  <option value="before_h2">第一个小标题前</option>
+                  <option value="after_first_paragraph">第一段后</option>
+                </select>
+              </div>
+              <div class="setting-item setting-wide">
+                <label>文章图集</label>
+                <div class="setting-control wrap-control">
+                  <span id="editCarouselInfo" class="hint">未选择</span>
+                  <button id="btnEditCarousel" class="ghost mini-btn">选择文章图集</button>
+                  <button id="btnEditGalleryEdit" class="ghost mini-btn">逐图标题／排序／删除</button>
+                  <span id="editGalleryInfo" class="hint"></span>
+                  <button id="btnEditCarouselClear" class="text-btn" hidden>清除</button>
+                  <select id="editCarouselMode">
+                    <option value="append">追加到原图集（默认）</option>
+                    <option value="replace">替换整个原图集</option>
+                  </select>
+                </div>
+              </div>
+              <div class="setting-item setting-wide">
+                <label>图集处理</label>
+                <p class="setting-explain">始终将原文件交给后台处理，不在软件端裁切、缩放、转码或改名；如需尺寸处理，请使用后台原生网页。</p>
+                <div class="setting-control wrap-control carousel-size">
+                  <select id="editCarouselSize">
+                    <option value="original">上传原文件（后台处理）</option>
+                  </select>
+                </div>
+              </div>
+              <div class="setting-item setting-wide">
+                <label>缩略图</label>
+                <div class="setting-control wrap-control">
+                  <select id="editIco">
+                    <option value="none">不修改</option>
+                    <option value="file">独立图片文件…</option>
+                    <option value="first">第一张同站正文图（独立上传缩略图）</option>
+                    <option value="url">填写已有地址或路径</option>
+                    <option value="clear">明确清空缩略图字段</option>
+                  </select>
+                  <button id="btnEditThumb" class="ghost mini-btn" hidden>重新选择图片</button>
+                  <span id="editThumbInfo" class="hint file-hint"></span>
+                  <img id="editThumbPreview" class="media-thumb-preview" alt="编辑缩略图预览" hidden>
+                  <input id="editThumbUrl" type="text" placeholder="例如 /static/upload/a.png 或完整 URL" aria-label="编辑缩略图地址" hidden>
+                  <span id="editThumbClearHint" class="hint" hidden>提交空值，不删除服务器文件；后台可能自动取图，保存后会核对。</span>
+                </div>
+              </div>
+              <div class="setting-item setting-wide publish-flags">
+                <label>文章属性</label>
+                <div class="setting-control option-group">
+                  <label class="check-option"><input type="checkbox" id="editTop"> 置顶</label>
+                  <label class="check-option"><input type="checkbox" id="editRec"> 推荐</label>
+                  <label class="check-option"><input type="checkbox" id="editHead"> 头条</label>
+                  <label class="check-option"><input type="checkbox" id="editRefreshDate"> 刷新发布时间为当前时间</label>
+                </div>
+                <p class="setting-explain">未操作的文章属性和发布时间保持不变。仅主动选择刷新时，才用电脑当前时间覆盖日期；映射指定日期时请勿勾选刷新。</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="card edit-mapping">
+          <div class="card-head">
+            <div class="section-title"><span class="step-badge">3</span><div><h3>字段映射与内链</h3><p>确认新内容字段，并查看当前文章内链状态</p></div></div>
+            <div class="toolbar-actions">
+              <button id="btnEditPreview" class="ghost compact" title="在隔离浏览器预览当前正文，不执行脚本或提交后台">浏览器预览</button>
+              <label class="check-option" title="关闭时提交不做软件额外的链接探测或改写"><input id="editCheckLinks" type="checkbox"> 提交前检查并处理站内链接</label>
+            </div>
+          </div>
+          <p class="mapping-help"><strong>说明：</strong>选择新 HTML 时，映射值可直接修改；即使改为空白也会按空白提交。</p>
+          <div class="tbl-wrap mapping-table"><table id="editMapTable">
+            <thead><tr><th>HTML 字段</th><th>预览（可修改）</th><th>CMS 字段</th><th>操作</th></tr></thead>
+            <tbody></tbody>
+          </table></div>
+          <div id="editLinkPanel" class="edit-link-panel" hidden>
+            <div class="edit-link-head">
+              <strong>内链检查</strong><span id="editLinkSummary" class="hint"></span>
+              <span class="spacer"></span>
+              <label class="check-option"><input id="editIssuesOnly" type="checkbox"> 只看问题</label>
+              <button id="btnEditLinkRefresh" class="ghost compact">重新检查</button>
+              <button id="btnEditLinkCancel" class="ghost compact" hidden>取消检查</button>
+            </div>
+            <div id="editLinkList" class="edit-link-list"></div>
+          </div>
+        </div>
+
+        <div class="card publish-backend-fields">
+          <div class="card-head">
+            <div class="section-title"><span class="step-badge">4</span><div><h3>文章后台字段设置</h3><p>直接使用当前文章表单中的附件等字段；文件会先按网页控件上传，再提交文章。</p></div></div>
+          </div>
+          <p class="mapping-help">这里只提交明确选择或修改的字段；本地文件路径不会直接发送到后台。</p>
+          <div class="row form-row content-submit-row" id="editSubmitterRow" hidden>
+            <label for="editSubmitter">网页提交按钮</label>
+            <select id="editSubmitter" class="compact-select" aria-label="选择编辑提交按钮"></select>
+            <span class="hint">网页会按实际点击的按钮提交；多个按钮时这里必须明确选择。</span>
+          </div>
+          <div id="editBackendFields" class="category-form-fields"></div>
+          <p id="editBackendEmpty" class="hint">选择文章后显示可设置字段。</p>
+        </div>
+
+        <div class="card action-bar sticky-action">
+        <div class="action-copy"><strong>准备提交修改</strong><span>提交前会再次读取文章表单并核验</span></div>
+        <div class="action-buttons">
+          <button id="btnSubmitEdit" class="cta big" disabled>提交修改</button>
+          <button id="btnEditCancel" class="ghost" hidden>取消任务</button>
+        </div>
+        <div class="prog" id="editProg" hidden><div class="bar"></div><span></span></div>
+        <p id="editMsg" class="msg action-msg"></p>
+      </div>
+    </section>
+
+    <!-- ── 查询修改 ── -->
+    <section id="tab-query" class="tab">
+      <div class="page-head">
+        <div><p class="page-kicker">PRODUCT DATA</p><h2>查询修改</h2>
+          <p>先看数据健康度，再按问题筛选、修复链接或批量维护。</p></div>
+      </div>
+      <div id="productHealth" class="health-grid">
+        <button class="health-card on" data-health="all"><span>产品总数</span><strong id="healthTotal">0</strong></button>
+        <button class="health-card" data-health="missing_model"><span>缺少型号</span><strong id="healthModel">0</strong></button>
+        <button class="health-card" data-health="missing_price" title="仅统计后台提供价格字段但值为空的产品，不表示后台必填校验失败"><span>价格字段为空</span><strong id="healthPrice">0</strong></button>
+        <button class="health-card" data-health="missing_front_url"><span>缺少前台链接</span><strong id="healthUrl">0</strong></button>
+        <div class="health-card health-time"><span>最近同步</span><strong id="healthSync">尚未同步</strong></div>
+      </div>
+      <div class="card">
+        <div class="card-head data-toolbar">
+          <div class="section-title"><div><h3>产品型号与价格</h3><p>本地缓存可直接查询，需要时再同步后台最新数据</p></div></div>
+          <div class="toolbar-actions">
+            <button id="btnRepairLinks" class="ghost compact">仅修复缺失链接</button>
+            <button id="btnProductModels" class="ghost compact">选择产品模型</button>
+            <select id="qModel" class="compact-select" aria-label="产品模型" hidden><option value="">自动识别唯一模型</option></select>
+            <button id="btnRemoteQuery" class="ghost compact" title="按后台真实搜索控件读取，不改本地缓存">后台实时查询</button>
+            <button id="btnProductNative" class="ghost compact" title="当搜索/分页由网页脚本驱动时，在完整浏览器中打开同一后台列表" hidden>原生网页查询</button>
+            <button id="btnPull" class="cta compact" title="逐条读取最新型号和价格，仅将变化写入本地缓存；产品较多时需等待">同步最新数据</button>
+            <button id="btnPullFull" class="ghost compact">完整同步</button>
+            <button id="btnPullCancel" class="ghost compact" hidden>取消</button>
+          </div>
+        </div>
+        <div class="filter-bar">
+          <span class="filter-icon">⌕</span>
+          <input id="qFilter" placeholder="按标题、型号或 ID 即时过滤">
+          <select id="qHealth" aria-label="健康状态筛选">
+            <option value="all">全部状态</option>
+            <option value="healthy">资料完整</option>
+            <option value="missing_model">缺少型号</option>
+            <option value="missing_price">缺少价格</option>
+            <option value="missing_front_url">缺少前台链接</option>
+          </select>
+          <select id="qSort" aria-label="产品排序">
+            <option value="id_desc">ID 从大到小</option>
+            <option value="id_asc">ID 从小到大</option>
+            <option value="model_asc">型号 A–Z</option>
+            <option value="issues_first">问题优先</option>
+          </select>
+          <span id="qCount" class="count-badge"></span>
+        </div>
+        <div class="bulk-bar">
+          <label class="check-option"><input id="qSelectAll" type="checkbox"> 选择当前页</label>
+          <span id="qSelected" class="hint">已选 0 项</span>
+          <label class="check-option" title="逐条提交；某条失败时继续处理后续条目，不会回滚已成功项目"><input id="qContinueErrors" type="checkbox"> 失败后继续</label>
+          <button id="btnBulkRepair" class="ghost compact" disabled>修复所选链接</button>
+          <button id="btnBulkEdit" class="ghost compact" disabled>批量设置型号/价格</button>
+        </div>
+        <div class="prog" id="qProg" hidden><div class="bar"></div><span></span></div>
+        <div class="tbl-wrap tall"><table id="qTable">
+          <thead><tr><th></th><th>ID</th><th>栏目</th><th>标题</th><th>型号</th><th>价格</th><th>链接健康</th>
+            <th>新型号</th><th>新价格</th><th></th></tr></thead>
+          <tbody></tbody>
+        </table></div>
+        <div class="pager"><button id="qPrev" class="ghost compact">上一页</button><span id="qPage" class="hint"></span><button id="qNext" class="ghost compact">下一页</button></div>
+        <p id="qMsg" class="msg"></p>
+      </div>
+    </section>
+
+    <!-- ── 栏目管理 ── -->
+    <section id="tab-category" class="tab">
+      <div class="page-head">
+        <div><p class="page-kicker">CATEGORY MANAGEMENT</p><h2>栏目管理</h2>
+          <p>查看、创建、修改和删除当前网站后台栏目。</p></div>
+        <span class="flow-label">栏目 · 层级 · SEO</span>
+      </div>
+      <div class="category-layout">
+        <div class="card category-tree-card">
+          <div class="card-head data-toolbar">
+            <div class="section-title"><div><h3>栏目树</h3><p>选择一个栏目后可查看和修改实际后台表单</p></div></div>
+            <div class="toolbar-actions">
+              <span id="categoryCount" class="count-badge"></span>
+              <button id="btnCategoryRefresh" class="ghost compact">刷新</button>
+            </div>
+          </div>
+          <div class="filter-bar"><span class="filter-icon">⌕</span>
+            <input id="categoryFilter" placeholder="搜索栏目名称或编号…" autocomplete="off"></div>
+          <div class="category-tree-actions"><button id="btnCategoryAddRoot" class="cta compact">＋ 新增顶级栏目</button>
+            <button id="btnCategoryBatch" class="ghost compact" title="仅当后台提供 multiplename 控件时可用">批量新增</button></div>
+          <div id="categoryAdminTree" class="category-admin-tree"></div>
+        </div>
+        <div class="card category-editor-card">
+          <div class="card-head data-toolbar">
+            <div class="section-title"><div><h3 id="categoryEditorTitle">栏目编辑</h3>
+              <p id="categoryEditorHint">从左侧选择栏目，或新增一个顶级栏目。</p></div></div>
+          </div>
+          <div id="categoryEditorEmpty" class="category-editor-empty">尚未选择栏目</div>
+          <div id="categoryEditorForm" hidden>
+            <div id="categoryDynamicFields" class="category-form-fields"></div>
+            <p id="categoryWarnings" class="mapping-help" hidden></p>
+            <div class="action-bar category-actions">
+              <button id="btnCategoryAddChild" class="ghost">新增子栏目</button>
+              <button id="btnCategoryNative" class="ghost" title="在完整浏览器中打开当前栏目的真实后台编辑页" hidden>原生网页</button>
+              <button id="btnCategorySave" class="cta">保存栏目</button>
+              <button id="btnCategoryCancel" class="ghost">取消</button>
+              <button id="btnCategoryDelete" class="ghost danger-action">删除栏目</button>
+            </div>
+          </div>
+          <p id="categoryMsg" class="msg"></p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── 网站 Slide/轮播（独立于文章图集） ── -->
+    <section id="tab-slide" class="tab">
+      <div class="page-head">
+        <div><p class="page-kicker">WEBSITE SLIDES</p><h2>网站轮播</h2>
+          <p>管理后台 Slide/轮播记录；这里不是文章正文的图集。</p></div>
+        <span class="flow-label">分组 · 图片 · 链接</span>
+      </div>
+      <div class="slide-layout">
+        <div class="card">
+          <div class="card-head data-toolbar">
+            <div class="section-title"><div><h3>轮播列表</h3><p>数据来自当前后台的 Slide/index 页面</p></div></div>
+            <div class="toolbar-actions"><span id="slideCount" class="count-badge"></span>
+              <button id="btnSlideRefresh" class="ghost compact">刷新</button>
+              <button id="btnSlideAdd" class="cta compact">＋ 新增轮播</button></div>
+          </div>
+          <div class="tbl-wrap"><table id="slideTable"><thead><tr>
+            <th>ID</th><th>图片</th><th>标题</th><th>副标题</th><th>链接</th><th>分组</th><th>排序</th><th></th>
+          </tr></thead><tbody></tbody></table></div>
+          <p id="slideMsg" class="msg"></p>
+        </div>
+        <div class="card slide-editor-card">
+          <div class="card-head data-toolbar"><div class="section-title"><div>
+            <h3 id="slideEditorTitle">轮播编辑</h3><p id="slideEditorHint">点击新增或选择一条记录进行编辑。</p>
+          </div></div></div>
+          <div id="slideEditorEmpty" class="category-editor-empty">尚未选择轮播记录</div>
+          <div id="slideEditorForm" hidden>
+            <div id="slideDynamicFields" class="category-form-fields"></div>
+            <div class="action-bar category-actions">
+              <button id="btnSlideSave" class="cta">保存轮播</button>
+              <button id="btnSlideCancel" class="ghost">取消</button>
+              <button id="btnSlideDelete" class="ghost danger-action">删除轮播</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── 单页 ── -->
+    <section id="tab-single" class="tab">
+      <div class="page-head">
+        <div><p class="page-kicker">SINGLE PAGES</p><h2>单页管理</h2>
+          <p>使用后台独立 Single/index 与 Single/mod 表单编辑关于、联系等单页内容。</p></div>
+        <span class="flow-label">列表 · 表单 · 回读</span>
+      </div>
+      <div class="single-layout">
+        <div class="card">
+          <div class="card-head data-toolbar"><div class="section-title"><div><h3>单页列表</h3><p>只读取当前后台实际暴露的单页入口</p></div></div>
+            <div class="toolbar-actions"><span id="singleCount" class="count-badge"></span><input id="singleFilter" class="compact-input" placeholder="标题或 ID"><button id="btnSingleRefresh" class="ghost compact">刷新</button></div>
+          </div>
+          <div class="tbl-wrap"><table id="singleTable"><thead><tr><th>ID</th><th>栏目</th><th>标题</th><th>时间</th><th>状态</th><th></th></tr></thead><tbody></tbody></table></div>
+          <p id="singleMsg" class="msg"></p>
+        </div>
+        <div class="card single-editor-card">
+          <div class="card-head"><div class="section-title"><div><h3 id="singleEditorTitle">单页编辑</h3><p id="singleEditorHint">选择一条单页记录后编辑。</p></div></div></div>
+          <div id="singleEditorEmpty" class="category-editor-empty">尚未选择单页</div>
+          <div id="singleEditorForm" hidden><div id="singleDynamicFields" class="category-form-fields"></div>
+            <div class="action-bar category-actions"><button id="btnSingleSave" class="cta">保存单页</button><button id="btnSingleCancel" class="ghost">取消</button></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── 其他后台模块：只读发现 + 动态安全表单 ── -->
+    <section id="tab-admin" class="tab">
+      <div class="page-head">
+        <div><p class="page-kicker">OTHER CMS MODULES</p><h2>其他后台模块</h2>
+          <p>从当前后台菜单发现配置、用户、模板、素材等模块；无表单页面可只读查看，保存仍只开放经过确认的同源表单。</p></div>
+        <span class="flow-label">菜单发现 · 动态字段 · 回读</span>
+      </div>
+      <div class="admin-module-layout">
+        <div class="card">
+          <div class="card-head data-toolbar"><div class="section-title"><div><h3>可发现模块</h3><p>无表单的配置、素材、用户、模板或回收站页面也可只读查看；删除、状态、清缓存等副作用链接由专用管理器处理。遇到动态脚本模块可直接打开原生网页。</p></div></div>
+            <div class="toolbar-actions"><span id="adminModuleCount" class="count-badge"></span><button id="btnAdminModuleRefresh" class="ghost compact">刷新</button></div>
+          </div>
+          <div class="tbl-wrap"><table id="adminModuleTable"><thead><tr><th>菜单</th><th>路由</th><th></th></tr></thead><tbody></tbody></table></div>
+          <p id="adminModuleMsg" class="msg"></p>
+        </div>
+        <div class="card admin-module-editor-card">
+          <div class="card-head"><div class="section-title"><div><h3 id="adminModuleEditorTitle">后台模块查看</h3><p id="adminModuleEditorHint">选择一个当前菜单中发现的模块。</p></div></div></div>
+          <div id="adminModuleEditorEmpty" class="category-editor-empty">尚未选择后台模块</div>
+          <div id="adminModuleReadOnly" class="admin-module-readonly" hidden><p id="adminModuleReadOnlyTitle" class="section-title"></p><p id="adminModuleReadOnlyText" class="cell-preview"></p><div id="adminModuleReadOnlyTables"></div><div id="adminModuleReadOnlyLinks"></div></div>
+          <div id="adminModuleEditorForm" hidden><div class="admin-module-submit-row"><label for="adminModuleSubmitter">提交按钮</label><select id="adminModuleSubmitter" aria-label="选择后台提交按钮"></select><span class="hint">网页会按实际点击的按钮提交；这里不会猜测预览/保存动作。</span></div><div id="adminModuleDynamicFields" class="category-form-fields"></div>
+            <div class="action-bar category-actions"><button id="btnAdminModuleSave" class="cta">保存模块</button><button id="btnAdminModuleCancel" class="ghost">取消</button></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── 留言 ── -->
+    <section id="tab-msg" class="tab">
+      <div class="page-head">
+        <div><p class="page-kicker">CUSTOMER MESSAGES</p><h2>留言列表</h2>
+          <p>集中查看网站访客提交的联系方式和产品需求。</p></div>
+      </div>
+      <div class="card">
+        <div class="card-head data-toolbar">
+          <div class="section-title"><div><h3>访客留言</h3><p>按后台提交时间倒序显示</p></div></div>
+          <div class="toolbar-actions">
+            <span id="msgCount" class="count-badge"></span>
+            <button id="btnMsg50" class="ghost compact">刷新 50 条</button>
+            <button id="btnMsgAll" class="ghost compact" title="逐页读取至末页，大量留言可能需要较长时间">加载全部</button>
+            <button id="btnMsgExport" class="ghost compact">导出所选/筛选结果</button>
+            <button id="btnMsgExportAll" class="ghost compact">导出全部 CSV</button>
+          </div>
+        </div>
+        <div class="prog" id="msgProg" hidden><div class="bar"></div><span></span></div>
+        <div class="filter-bar">
+          <span class="filter-icon">⌕</span>
+          <input id="msgFilter" placeholder="搜索姓名、电话、邮箱、产品或内容">
+          <select id="msgStatus"><option value="all">全部状态</option><option value="visible">前端显示</option><option value="hidden">前端隐藏</option><option value="processed">已处理（明确标注）</option><option value="unprocessed">未处理（明确标注）</option><option value="approved">已审核</option><option value="unapproved">未审核</option><option value="enabled">开启</option><option value="disabled">关闭</option><option value="value0">状态值 0</option><option value="value1">状态值 1</option><option value="unknown">未确认</option></select>
+          <button id="btnMsgServerFilter" class="ghost compact" title="使用后台真实关键词/状态筛选并重新分页；无法确认时保留本地筛选">后台筛选</button>
+          <button id="btnMsgNativeFilter" class="ghost compact" hidden title="在当前认证网页中执行留言筛选">原生网页筛选</button>
+          <span id="msgFilteredCount" class="count-badge"></span>
+        </div>
+        <div class="bulk-bar">
+          <label class="check-option"><input id="msgSelectAll" type="checkbox"> 选择当前结果</label>
+          <span id="msgSelected" class="hint">已选 0 项</span>
+          <button id="btnMsgBulkStatus" class="ghost compact" disabled>批量切换状态</button>
+        </div>
+        <div class="tbl-wrap tall"><table id="msgTable">
+          <thead><tr><th></th><th>时间</th><th>姓名</th><th>联系方式</th><th>行业</th>
+            <th>城市</th><th>需求产品</th><th>状态</th><th>访客</th><th>内容</th><th></th></tr></thead>
+          <tbody></tbody>
+        </table></div>
+      </div>
+    </section>
+
+    <!-- ── 日志 ── -->
+    <section id="tab-log" class="tab">
+      <div class="page-head">
+        <div><p class="page-kicker">DIAGNOSTICS</p><h2>运行日志</h2>
+          <p>查看当前站点运行记录，执行后台结构诊断或导出脱敏信息。</p></div>
+      </div>
+      <div class="card">
+        <div class="card-head data-toolbar">
+          <div class="section-title"><div><h3>当前标签日志</h3><p>诊断文件会自动隐藏密码、Cookie 和令牌</p></div></div>
+          <div class="toolbar-actions">
+            <button id="btnBackendDiag" class="cta compact">后台结构诊断</button>
+            <button id="btnBackendDiagCancel" class="ghost compact" hidden>取消诊断</button>
+            <button id="btnDiag" class="ghost compact">导出脱敏诊断包</button>
+            <button id="btnDiagCopy" class="ghost compact" hidden>复制诊断路径</button>
+            <button id="btnDiagOpen" class="ghost compact" hidden>打开诊断文件</button>
+            <button id="btnLogClear" class="ghost compact">清空显示</button>
+          </div>
+        </div>
+        <div class="prog" id="diagProg" hidden><div class="bar"></div><span></span></div>
+        <p id="diagMsg" class="msg"></p>
+        <div id="pendingOpsPanel" class="pending-ops" hidden>
+          <strong>待核对操作</strong><span class="hint">这些请求可能已经到达后台，软件不会自动重发。</span>
+          <div id="pendingOpsList"></div>
+        </div>
+        <pre id="logBox" class="logbox"></pre>
+      </div>
+      <div class="card">
+        <div class="card-head data-toolbar">
+          <div class="section-title"><div><h3>操作审计记录</h3><p>只保存字段摘要与后台结果，不保存密码、Cookie或完整正文</p></div></div>
+          <div class="toolbar-actions"><span id="auditCount" class="count-badge"></span>
+            <button id="btnAuditRefresh" class="ghost compact">刷新记录</button>
+            <button id="btnAuditExport" class="ghost compact">导出 CSV</button></div>
+        </div>
+        <div class="tbl-wrap tall"><table id="auditTable"><thead><tr><th>时间</th><th>操作</th><th>对象</th><th>ID</th><th>结果</th><th>后台信息</th><th></th></tr></thead><tbody></tbody></table></div>
+      </div>
+    </section>
+  </div>
+</div>
+<!-- 待处理链接面板：逐条明确保留、替换或去链 -->
+<div id="linkMask" class="dlg-mask" hidden>
+  <div class="dlg-card link-card" role="dialog" aria-modal="true" aria-labelledby="linkTitle">
+    <div class="dlg-head"><span class="dlg-icon warn">⚠</span><h3 id="linkTitle">发现待处理内链</h3></div>
+    <div class="link-tip">每条默认保留原链接。请选择“替换”或“去掉链接”才会修改原稿；候选地址可访问不代表其内容一定相关。</div>
+    <div id="linkList" class="link-list"></div>
+    <p id="linkError" class="msg bad link-error" role="alert"></p>
+    <div class="dlg-btns link-btns">
+      <button id="linkIgnoreAll" class="warn">全部明确去链</button>
+      <button id="linkApplyVerified" class="ghost">将有候选项设为替换</button>
+      <span class="spacer"></span>
+      <button id="linkCancel" class="ghost">取消本次操作</button>
+      <button id="linkApply" class="cta">应用并继续</button>
+    </div>
+  </div>
+</div>
+<!-- 产品高级字段编辑器 -->
+<div id="galleryEditorMask" class="dlg-mask" hidden>
+  <div class="dlg-card product-editor-card" role="dialog" aria-modal="true" aria-labelledby="galleryEditorTitle">
+    <div class="dlg-head"><h3 id="galleryEditorTitle">文章图集</h3></div>
+    <p class="field-editor-hint">图片与标题一起排序。删除只移除文章引用，不删除服务器文件；点“应用到本次设置”后仍需提交文章。可拖动或使用上移／下移。</p>
+    <div id="galleryEditorRows" class="category-form-fields"></div>
+    <div class="dlg-btns"><button id="galleryEditorAdd" class="ghost">添加本地图片</button><button id="galleryEditorCancel" class="ghost">取消</button><button id="galleryEditorApply" class="cta">应用到本次设置</button></div>
+  </div>
+</div>
+<div id="productEditorMask" class="dlg-mask" hidden>
+  <div class="dlg-card product-editor-card" role="dialog" aria-modal="true">
+    <div class="dlg-head"><span class="dlg-icon confirm">✎</span><h3 id="productEditorTitle">产品高级编辑</h3></div>
+    <p id="productEditorHint" class="field-editor-hint"></p>
+    <div id="productEditorFields" class="category-form-fields"></div>
+    <p id="productEditorMsg" class="msg"></p>
+    <div class="dlg-btns"><button id="productEditorCancel" class="ghost">取消</button><button id="productEditorSave" class="cta">保存并回读验证</button></div>
+  </div>
+</div>
+<!-- 留言回复：控件和值来自当前后台表单 -->
+<div id="messageReplyMask" class="dlg-mask" hidden>
+  <div class="dlg-card product-editor-card" role="dialog" aria-modal="true" aria-labelledby="messageReplyTitle">
+    <div class="dlg-head"><span class="dlg-icon confirm">✎</span><h3 id="messageReplyTitle">留言回复</h3></div>
+    <p class="field-editor-hint">只修改本次操作的字段；状态来自后台，回复不会自动设为显示。</p>
+    <div id="messageReplyFields" class="category-form-fields"></div>
+    <p id="messageReplyMsg" class="msg"></p>
+    <div class="dlg-btns"><button id="messageReplyCancel" class="ghost">取消</button><button id="messageReplySave" class="cta">保存回复并核验</button></div>
+  </div>
+</div>
+<!-- 字段完整编辑器：适合正文等长内容，明确保留空白修改 -->
+<div id="fieldEditorMask" class="dlg-mask" hidden>
+  <div class="dlg-card field-editor-card" role="dialog" aria-modal="true">
+    <div class="dlg-head"><span class="dlg-icon confirm">✎</span><h3 id="fieldEditorTitle">编辑字段</h3></div>
+    <p id="fieldEditorHint" class="field-editor-hint"></p>
+    <textarea id="fieldEditorValue" spellcheck="false"></textarea>
+    <div class="dlg-btns">
+      <button id="fieldEditorRestore" class="ghost">还原原始值</button>
+      <span class="spacer"></span>
+      <button id="fieldEditorCancel" class="ghost">取消</button>
+      <button id="fieldEditorSave" class="cta">保存修改</button>
+    </div>
+  </div>
+</div>
+<!-- 正文浏览器式预览：隔离 iframe，不执行脚本、不允许表单提交。 -->
+<div id="htmlPreviewMask" class="dlg-mask" hidden>
+  <div class="dlg-card html-preview-card" role="dialog" aria-modal="true" aria-labelledby="htmlPreviewTitle">
+    <div class="dlg-head"><span class="dlg-icon confirm">▣</span><h3 id="htmlPreviewTitle">正文浏览器预览</h3></div>
+    <p id="htmlPreviewHint" class="field-editor-hint">这是当前软件映射后的正文预览。脚本、表单提交和跨站写入已禁用；主题 CSS 与服务器最终处理仍需在后台前台核对。</p>
+    <iframe id="htmlPreviewFrame" title="正文浏览器预览" sandbox="" referrerpolicy="no-referrer"></iframe>
+    <div class="dlg-btns"><span class="spacer"></span><button id="htmlPreviewClose" class="ghost">关闭</button></div>
+  </div>
+</div>
+<!-- 版本、更新与升级准备 -->
+<div id="aboutMask" class="dlg-mask" hidden>
+  <div class="dlg-card about-card" role="dialog" aria-modal="true">
+    <div class="dlg-head"><span class="dlg-icon confirm">↻</span><h3>版本与更新</h3></div>
+    <div class="about-body">
+      <div class="about-version"><strong id="aboutVersion">—</strong><span id="aboutBuild" class="hint"></span></div>
+      <p id="aboutStatus" class="msg">正在读取版本信息…</p>
+      <div class="about-actions">
+        <button id="btnCheckUpdate" class="cta compact">检查更新</button>
+        <button id="btnUpdateBackup" class="ghost compact">备份配置与产品库</button>
+        <button id="btnOpenBackup" class="ghost compact" hidden>打开备份</button>
+      </div>
+      <div class="about-section"><strong>更新日志</strong><div id="aboutChangelog" class="changelog">暂无更新日志</div></div>
+      <div class="about-section"><strong>安装包签名</strong><p id="aboutSigning" class="hint"></p></div>
+    </div>
+    <div class="dlg-btns"><button id="btnAboutClose" class="ghost">关闭</button></div>
+  </div>
+</div>
+<!-- 统一美化对话框（替代原生 confirm/alert） -->
+<div id="dlgMask" class="dlg-mask" hidden>
+  <div class="dlg-card" role="dialog" aria-modal="true">
+    <div class="dlg-head"><span id="dlgIcon" class="dlg-icon"></span><h3 id="dlgTitle"></h3></div>
+    <div id="dlgBody" class="dlg-body"></div>
+    <div class="dlg-btns">
+      <button id="dlgCancel" class="ghost">取消</button>
+      <button id="dlgOk" class="cta">确定</button>
+    </div>
+  </div>
+</div>
+<script src="app.js"></script>
+</body>
+</html>

@@ -1,0 +1,73 @@
+# Python bytecode and local virtual environments
+__pycache__/
+*.py[cod]
+.build_env/
+.venv/
+venv/
+
+# Packaging output and generated binaries
+build/
+dist/
+*.exe
+.build_runtime/
+
+# Local runtime data, credentials, sessions, caches, and diagnostics
+publisher_config.json
+site_sessions/
+drafts/
+backend_diagnostics/
+products_cache.db
+update_backups/
+*.db
+*.db-*
+*.sqlite*
+*.log
+*.log.*
+request_audit.log
+
+# Secrets and machine-specific configuration
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.pfx
+*.p12
+*.crt
+*.cer
+*.credentials*
+*credential*.json
+*secret*.json
+*token*.json
+*cookie*.json
+*session*.json
+
+# Private site audit material and generated evidence
+.workbuddy/
+.audit_lines.txt
+.symbols.txt
+audit_parity_*.py
+audit_parity_live_evidence_*.json
+audit_parity_live_latest.json
+audit_parity_phase1_validation.json
+audit_parity_readonly_latest.txt
+test_product_live_fixture.py
+/软件*.md
+/一致性优化实施台账.md
+
+# Developer-only regression suites (kept locally, omitted from distributions)
+/test_*.py
+/test_ui_*.js
+
+# Keep only the current packaging recipe in the distribution repository
+*.spec
+!PbootCMS_Publisher_W_v3.4.10.spec
+
+# Temporary working directories
+/tmp*/
+
+# Editor and operating-system files
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
