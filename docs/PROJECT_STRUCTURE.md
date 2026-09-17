@@ -9,6 +9,7 @@
 | `.gitignore` | 排除会话、配置、日志、数据库、草稿、构建产物和开发测试文件。 |
 | `LICENSE` | 项目的 MIT 开源许可证。 |
 | `README.md` | 项目定位、功能、下载、快速开始、构建和数据安全说明。 |
+| `README.en.md` | English project overview, operation guide, build instructions, and data-safety notes. |
 | `app.py` | pywebview 应用入口、多站点状态和 Python/JavaScript API 桥接。 |
 | `app_meta.py` | 应用名称、版本号、构建日期和版本记录的唯一数据源。 |
 | `config.py` | 本地配置读写、迁移、默认值和并发保护。 |

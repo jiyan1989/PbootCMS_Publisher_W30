@@ -1,5 +1,7 @@
 # PbootCMS Publisher
 
+[English](README.en.md) | 简体中文
+
 PbootCMS Publisher 是一款 Windows 桌面端内容发布与后台管理工具。应用通过目标站点的实际后台表单和上传配置执行操作，支持 HTML 稿件解析、字段映射、媒体上传、批量发布和常用后台管理。
 
 | 项目 | 信息 |
